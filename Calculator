@@ -1,0 +1,53 @@
+
+library(shiny)
+library(C50)
+##datTrain
+
+model <- C5.0(PostComplication ~ ., trials = 4,model = c("tree"),winnow = c(FALSE),
+              data = datTrain)
+
+
+ui <- fluidPage(
+  titlePanel("ICU thrombocytopenia Calculator"),
+  sidebarLayout(
+    sidebarPanel(
+      numericInput("Platelet", "Platelet:", 0),
+      numericInput("Hemoglobin", "Hemoglobin:", 0),
+      numericInput("Ast", "Ast:", 0),
+      numericInput("Sysbp_min", "Sysbp_min:", 0),
+      numericInput("Sysbp_max", "Sysbp_max:", 0),
+      numericInput("Heartrate_mean", "Heartrate_mean:", 0),
+      numericInput("Heartrate_max", "Heartrate_max:", 0),
+      numericInput("Creatinine", "Creatinine:", 0),
+      actionButton("submit", "Submit")
+    ),
+    mainPanel(
+      textOutput("prediction")
+    )
+  )
+)
+
+server <- function(input, output) {
+  observeEvent(input$submit, {
+    data <- data.frame(
+      Platelet = input$Platelet,
+      Hemoglobin = input$Hemoglobin,
+      Ast = input$Ast,
+      Sysbp_min = input$Sysbp_min,
+      Sysbp_max = input$Sysbp_max,
+      Heartrate_mean = input$Heartrate_mean,
+      Heartrate_max = input$Heartrate_max,
+      Creatinine = input$Creatinine
+    )
+    prediction <- predict(model, newdata = data)
+    output$prediction <- renderText({
+      if (prediction == "Yes") {
+        paste("Prediction: Yes")
+      } else {
+        paste("Prediction: No")
+      }
+    })
+  })
+}
+
+shinyApp(ui = ui, server = server)
