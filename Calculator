@@ -51,3 +51,65 @@ server <- function(input, output) {
 }
 
 shinyApp(ui = ui, server = server)
+
+
+
+#20240422
+library(caret)
+library(e1071) 
+
+ui <- fluidPage(
+  titlePanel("Prediction of postoperative thrombocytopenia 
+             in geriatric ICU patients2"),
+  sidebarLayout(
+    sidebarPanel(
+      numericInput("SOFA_input", "SOFA:", 5),
+      numericInput("pH_input", "pH:", 7),
+      numericInput("Lactate_input", "Lactate:", 4),
+      numericInput("INR_input", "INR:", 1.6),
+      numericInput("Sodium_input", "Sodium:", 145),
+      numericInput("sysbp_min_input", "Minimum Systolic Blood Pressure:", 111),
+      numericInput("Norepinephrine_input", "Norepinephrine:", 0),
+      numericInput("plt_icu_fri_input", "Platelet ICU Friday:", 155),
+      actionButton("go_button", "Calculate")
+    ),
+    mainPanel(
+      textOutput("prediction_text")
+    )
+  )
+)
+
+server <- function(input, output, session) {
+
+  svmFit <- readRDS("svmFit_model.rds")  
+  observeEvent(input$go_button, {
+    
+
+    newdata <- data.frame(
+      SOFA = as.numeric(input$SOFA_input),
+      pH = as.numeric(input$pH_input),
+      Lactate = as.numeric(input$Lactate_input),
+      INR = as.numeric(input$INR_input),
+      Sodium = as.numeric(input$Sodium_input),
+      sysbp_min = as.numeric(input$sysbp_min_input),
+      Norepinephrine = as.numeric(input$Norepinephrine_input),
+      plt_icu_fri = as.numeric(input$plt_icu_fri_input)
+    )
+    
+    # 预处理新数据，与训练数据保持一致
+    # 在训练模型时已经进行了中心化和规模化处理
+    preProcValues <- svmFit$preProcess
+    newdata_norm <- predict(preProcValues, newdata)
+    
+    prediction <- predict(svmFit, newdata = newdata_norm)
+    
+    output$prediction_text <- renderText({
+      paste0("The predicted category is: ", prediction)
+    })
+  })
+}
+
+shinyApp(ui = ui, server = server)
+
+
+
