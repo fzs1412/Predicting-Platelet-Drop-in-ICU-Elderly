@@ -5,7 +5,7 @@ library(DataExplorer)
 library("caretEnsemble")
 library(pROC)
 
-dat<-read.csv("C:/Users/lxqji/OneDrive/R/23高龄血小板减少/数据处理/2307dat_mod.csv")
+dat<-read.csv("2307dat_mod.csv")
 dat = subset(dat, select=c(TP,Age,Male,Surgery_time,Surgery,hormone_day1,
                            antiplatelet_day1,shock_day1,SOFA,Sepsis,
                            Hypertension,Diabete,
@@ -19,33 +19,77 @@ tab1<-twogrps(dat,gvar = "TP",norm.rd = 1,cat.rd = 1,
               skewvar = c("HXJstay","ICUstay","Hosp..LOS","Cost",
                           "ALTicu","ASTicu",
                           "PT") )
+#202404
+dat= subset(dat, select=c(TP,gcs,Dopamine,Dobutamine,Norepinephrine,Adrenaline,
+                         aspirin_day1,tirofiban_day1,P2Y12_inhibitors_day1,
+                         short_acting_glucocorticoids_day1,
+                         intermediate_glucocorticoids_day1,
+                         long_acting_glucocorticoids_day1,Bilirubin_Total,Po2,FIO2,Bicarbonate,Sodium,Potassium,Calcium,Magnesium))
+
+dat= subset(dat, select=c(TP,Crp,PCT,Bilirubin_Total,Po2,FIO2,Bicarbonate,Sodium,Potassium,Calcium,Magnesium))
+dat=dat%>% 
+  mutate(PF=(Po2/FIO2)*100) 
+skewvar2 = c( "Bilirubin_Total" ,"PCT" ,"Crp"  )
+tab1<-twogrps(dat,gvar = "TP",norm.rd = 1,cat.rd = 1,sk.rd=1,minfactorlevels = 5,
+              skewvar = skewvar2 )
+
+dat = subset(dat, select=c(class,Age,Male,hormone_day1,
+                           antiplatelet_day1,shock_day1,SOFA,Sepsis,
+                           Hypertension,Diabete,
+                           WBC,plt_icu_fri,Cr_icu_fri,Hemoglobin,
+                           ALTicu,ASTicu,PT,APTT,
+                           sysbp_max,sysbp_min,heartrate_max,heartrate_min,
+                           tempc_max,tempc_min,
+                           Hospital_mortality,ICUstay,HXJstay,Hosp..LOS,Cost))
+library(CBCgrps)
+tab1<-multigrps(dat,gvar = "class",norm.rd = 1,cat.rd = 1, sk.rd=1,minfactorlevels = 6,
+                skewvar = c("HXJstay","ICUstay","Hosp..LOS","Cost",
+                            "ALTicu","ASTicu",
+                            "PT"))
+colnames(tab1) <- c("Col1", "Col2", "Col3", "Col4", "Col5","Col6","Col7")
+flextable::save_as_docx(flextable::flextable(as.data.frame(tab1)),
+                        path = "2024tab1.docx")
+
 print(tab1,quote = TRUE)  
+
+#randomForest
+dat=read.csv("2404dat_mod.csv")
+mdrrClass=dat$TP
+dat=subset(dat, select=-c(TP))
+subsets = c(10,20,30,40,50,60,70)       
+ctrl= rfeControl(functions = rfFuncs, method = "cv",verbose = FALSE, returnResamp = "final")
+Profile = rfe(dat, mdrrClass, sizes = subsets, rfeControl = ctrl)	
+library(randomForest)
+print(Profile)
+plot(Profile)
+Profile$optVariables 
+
 #lasso
 library(glmnet)
 library(ggplot2)
-X <- as.matrix(dat[, 1:(ncol(dat) - 1)])  # 提取预测变量
-y <- as.vector(dat[, ncol(dat)])    # 提取预测变量
-# 使用交叉验证选择最佳lambda值
+X <- as.matrix(dat[, 1:(ncol(dat) - 1)])   
+y <- as.vector(dat[, ncol(dat)])     
+ 
 cv_lasso <- cv.glmnet(X, y, alpha = 1)
 best_lambda <- cv_lasso$lambda.min*7
-#可以调整best_lambda大小已减少变量  *2    *5等
+ 
 final_lasso_model <- glmnet(X, y, alpha = 1, lambda = best_lambda)
 coefficients <- coef(final_lasso_model)
-# 查看非零系数
+ 
 print(coefficients[coefficients != 0])
 lasso_path <- glmnet(X, y, alpha = 1)
-# 绘制Lasso路径图
+ 
 plot(lasso_path, xvar = "lambda", label = TRUE, main = "Lasso Path")
 abline(v = log(best_lambda), lty = 2, col = "red")
 legend("topright", legend = c("Best Lambda"), col = "red", lty = 2)
-# 提取交叉验证误差和对应的lambda值
+ 
 cv_errors <- data.frame(
   lambda = log(cv_lasso$lambda),
   mse = cv_lasso$cvm,
   lower_ci = cv_lasso$cvlo,
   upper_ci = cv_lasso$cvup
 )
-# 使用ggplot2绘制误差与lambda之间的关系图
+ 
 g <- ggplot(cv_errors, aes(x = lambda, y = mse)) +
   geom_line() +
   geom_point() +
@@ -55,21 +99,21 @@ g <- ggplot(cv_errors, aes(x = lambda, y = mse)) +
   labs(x = "log(Lambda)", y = "Cross-Validation Error", title = "Cross-Validation Error vs. Lambda") +
   annotate("text", x = log(best_lambda) + 0.5, y = max(cv_errors$mse), label = "Best Lambda", color = "red")
 print(g)
-# 提取非零系数的索引
+ 
 non_zero_indices <- which(coefficients != 0)
-# 获取非零系数对应的变量名
+ 
 selected_variables <- rownames(coefficients)[non_zero_indices]
-# 打印选定的变量名
+ 
 print(selected_variables)
-#最终选择
+ 
 dat=dat[,non_zero_indices]
 non_zero_indices
 
 
-dat<-read.csv("C:/Users/lxqji/OneDrive/R/23高龄血小板减少/数据处理/2307dat_mod.csv")
+dat<-read.csv("2307dat_mod.csv")
 dat=dat[dat$Surgery_time==1,]
 
-#最终变量
+ 
 dat= subset(dat, select=c(plt_icu_fri,Hemoglobin,ASTicu,sysbp_min,sysbp_max,heartrate_mean,
                           heartrate_max,Cr_icu_fri,TP)) 
 colnames(dat)=c("Platelet","Hemoglobin","Ast","Sysbp_min","Sysbp_max",         
@@ -184,7 +228,7 @@ ggplot(caret::varImp(model_list$C5.0))
 ggplot(caret::varImp(model_list$SVM))
 ggplot(caret::varImp(model_list$Bayes))
 
-##模型C5.0
+##C5.0
 library(lime)
 explanation<-lime(datTrain,model_list$C5.0)
 exp<-lime::explain(
@@ -205,8 +249,29 @@ Ensmeble_la_un <- break_down_uncertainty(
   predict_function = p_fun,
   path = "average")
 plot(Ensmeble_la_un)
+#class
+train_control <- trainControl(  method="boot",
+                                number=25,  savePredictions="final",  classProbs=TRUE,
+                                index=createResample(datTrain$PostComplication, 25),
+                                summaryFunction=twoClassSummary)
 
+SVMFit= caret::train(  PostComplication ~ ., data = datTrain,   method="svmLinearWeights",
+                       trControl = fitControl,
+                    tuneGrid=expand.grid(  cost=seq(0.1,1,0.2),  weight=c(0.5,0.8,1)),verbose = FALSE)
 
+rfFit <- caret::train(PostComplication ~ ., data = datTrain, method = "rf", trControl = fitControl, verbose = FALSE)               
+                    
+C5.0=caret::train(  PostComplication ~ ., data = datTrain,  method="C5.0", 
+                      tuneGrid=expand.grid( trials=(1:5)*10,   model=c("tree", "rules"),  winnow=c(TRUE, FALSE)))  
+
+preds <- predict(C5.0, datTest)
+confMat <- confusionMatrix(preds, datTest$PostComplication)
+print(confMat) 
+
+XGboost=caret::train(  PostComplication ~ ., data = datTrain,  method="xgbTree",  tuneGrid=expand.grid(
+  nrounds=(1:5)*10,  max_depth= 6, eta=c(0.1),gamma= c(0.1),
+  colsample_bytree=1,  min_child_weight=c(0.5,0.8,1),
+  subsample=c(0.3,0.5,0.8)))  
 ##mimic
 dat<-read.csv("C:/Users/lxqji/OneDrive/R/23高龄血小板减少/数据处理/mimic_com.csv")
 
@@ -267,6 +332,31 @@ doc <- body_add_table(doc, results_df)
 
 # 保存结果到word文件
 print(doc, target = "混淆矩阵1.docx")
+
+#fig 2
+  library(ggplot2)
+
+variables <- c('ICU length of stay(days)', 'Ventilation duration(days)','Length of hospital stay(days)', 'Cost(×10^4 yuan for Cost)')
+NoThrombocytopenia <- c(2.7, 0.7, 20, 5.16)
+MildThrombocytopenia <- c(5.8, 1.7, 25, 8.76)
+ModerateThrombocytopenia <- c(9.1, 3.7, 28, 9.99)
+SevereThrombocytopenia <- c(7.2, 6.3, 15, 6.52)
+data <- data.frame(variables, NoThrombocytopenia, MildThrombocytopenia, ModerateThrombocytopenia, SevereThrombocytopenia)
+
+data_melt <- reshape2::melt(data, id.vars = 'variables')
+
+p <- ggplot(data_melt, aes(x = variables, y = value, fill = variable)) +
+  geom_bar(stat = 'identity', position = position_dodge()) +
+  theme_bw() +
+  ylab('Value') +
+  scale_fill_discrete(name = "Thrombocytopenia Levels", breaks = c("NoThrombocytopenia", "MildThrombocytopenia", "ModerateThrombocytopenia", "SevereThrombocytopenia"), labels = c("No Thrombocytopenia", "Mild Thrombocytopenia", "Moderate Thrombocytopenia", "Severe Thrombocytopenia")) + 
+  ggtitle('Comparison of Outcomes Across Different Degrees of Thrombocytopenia')
+
+p + annotate("text", x = 1, y = 29, label = "P < 0.001")+
+  annotate("text", x = 2, y = 29, label = "P < 0.001")+
+  annotate("text", x = 3, y = 29, label = "P < 0.001")+
+  annotate("text", x = 4, y = 29, label = "P < 0.001")+
+  theme(legend.position = c(.85, .7))
 
 
 
