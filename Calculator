@@ -6,7 +6,6 @@ library(C50)
 model <- C5.0(PostComplication ~ ., trials = 4,model = c("tree"),winnow = c(FALSE),
               data = datTrain)
 
-
 ui <- fluidPage(
   titlePanel("ICU thrombocytopenia Calculator"),
   sidebarLayout(
@@ -29,6 +28,7 @@ ui <- fluidPage(
 
 server <- function(input, output) {
   observeEvent(input$submit, {
+    # Construct new data
     data <- data.frame(
       Platelet = input$Platelet,
       Hemoglobin = input$Hemoglobin,
@@ -39,13 +39,13 @@ server <- function(input, output) {
       Heartrate_max = input$Heartrate_max,
       Creatinine = input$Creatinine
     )
-    prediction <- predict(model, newdata = data)
-    output$prediction <- renderText({
-      if (prediction == "Yes") {
-        paste("Prediction: Yes")
-      } else {
-        paste("Prediction: No")
-      }
+    
+    # Use rpart to extract probabilities
+    prediction_prob <- predict(tree_model, newdata = data, type = "prob")[, 2]
+    
+    # Update output
+    output$prediction_prob <- renderText({
+      paste("Predicted Probability:", prediction_prob)
     })
   })
 }
@@ -112,4 +112,50 @@ server <- function(input, output, session) {
 shinyApp(ui = ui, server = server)
 
 
+#202404
+ui <- fluidPage(
+  titlePanel("Predicting the Severity of Postoperative Thrombocytopenia in Geriatric ICU Patients"),
+  sidebarLayout(
+    sidebarPanel(
+      numericInput("SOFA_input", "SOFA- First Day:", 5),
+      numericInput("pH_input", "pH- First Day:", 7),
+      numericInput("Lactate_input", "Lactate(mmol/L)- First Day:", 4),
+      numericInput("INR_input", "International Normalized Ratio- First Day:", 1.6),
+      numericInput("Sodium_input", "Sodium(mmol/L)- First Day:", 145),
+      numericInput("sysbp_min_input", "Minimum Systolic Blood Pressure(mmHg) - First Day:", 111),
+      numericInput("Norepinephrine_input", "Norepinephrine- First Day:", 0),
+      numericInput("plt_icu_fri_input", "Platelet (×10^9/L) - First Day:", 155),
+      actionButton("go_button", "Calculate")
+    ),
+    mainPanel(
+      textOutput("prediction_text")
+    )
+  )
+)
 
+# 编写服务器逻辑
+server <- function(input, output, session) {
+
+  svmFit <- readRDS("svmFit_model.rds")  
+  observeEvent(input$go_button, {
+
+    newdata <- data.frame(
+      SOFA = as.numeric(input$SOFA_input),
+      pH = as.numeric(input$pH_input),
+      Lactate = as.numeric(input$Lactate_input),
+      INR = as.numeric(input$INR_input),
+      Sodium = as.numeric(input$Sodium_input),
+      sysbp_min = as.numeric(input$sysbp_min_input),
+      Norepinephrine = as.numeric(input$Norepinephrine_input),
+      plt_icu_fri = as.numeric(input$plt_icu_fri_input)
+    )
+    
+    preProcValues <- svmFit$preProcess
+    newdata_norm <- predict(preProcValues, newdata)
+    prediction <- predict(svmFit, newdata = newdata_norm)
+    output$prediction_text <- renderText({
+      paste0("The predicted category is: ", prediction)
+    })
+  })
+}
+shinyApp(ui = ui, server = server)
