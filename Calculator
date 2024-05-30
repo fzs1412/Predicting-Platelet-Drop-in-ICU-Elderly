@@ -1,27 +1,26 @@
-
 library(shiny)
 library(C50)
-##datTrain
 
-model <- C5.0(PostComplication ~ ., trials = 4,model = c("tree"),winnow = c(FALSE),
-              data = datTrain)
+# Load the saved model
+model <- readRDS("path_to_your_file/C50_model.rds")
 
 ui <- fluidPage(
-  titlePanel("ICU thrombocytopenia Calculator"),
+  titlePanel("Prediction of postoperative thrombocytopenia in geriatric ICU patients"),
   sidebarLayout(
     sidebarPanel(
-      numericInput("Platelet", "Platelet:", 0),
-      numericInput("Hemoglobin", "Hemoglobin:", 0),
-      numericInput("Ast", "Ast:", 0),
-      numericInput("Sysbp_min", "Sysbp_min:", 0),
-      numericInput("Sysbp_max", "Sysbp_max:", 0),
-      numericInput("Heartrate_mean", "Heartrate_mean:", 0),
-      numericInput("Heartrate_max", "Heartrate_max:", 0),
-      numericInput("Creatinine", "Creatinine:", 0),
+      # Prompt for vital signs on the first day of ICU admission
+      numericInput("Platelet", "Platelets (×10^9/L) - First Day:", 0),
+      numericInput("Hemoglobin", "Hemoglobin (g/L) - First Day:", 0),
+      numericInput("Ast", "Aspartate Aminotransferase (AST) (U/L) - First Measurement:", 0),
+      numericInput("Sysbp_min", "Minimum Systolic Blood Pressure (mmHg) - First Day:", 0),
+      numericInput("Sysbp_max", "Maximum Systolic Blood Pressure (mmHg) - First Day:", 0),
+      numericInput("Heartrate_mean", "Mean Heart Rate (bpm) - First Day:", 0),
+      numericInput("Heartrate_max", "Maximum Heart Rate (bpm) - First Day:", 0),
+      numericInput("Creatinine", "Creatinine (μmol/L) - First Measurement:", 0),
       actionButton("submit", "Submit")
     ),
     mainPanel(
-      textOutput("prediction")
+      textOutput("prediction_prob")
     )
   )
 )
@@ -40,8 +39,8 @@ server <- function(input, output) {
       Creatinine = input$Creatinine
     )
     
-    # Use rpart to extract probabilities
-    prediction_prob <- predict(tree_model, newdata = data, type = "prob")[, 2]
+    # Use the loaded model to make predictions
+    prediction_prob <- predict(model, newdata = data, type = "prob")[, 2]
     
     # Update output
     output$prediction_prob <- renderText({
